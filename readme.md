@@ -1,46 +1,224 @@
-Proteomics Gem - Analysis Pipeline (PAP)This Shiny application is a complete, end-to-end tool for the analysis of proteomics data. It guides the user through data loading, normalization, and several common downstream analysis methods.The app is built on a modular framework, with each analysis step contained in its own tab and R file.Table of ContentsFeaturesInstallationHow to Run the AppApp Workflow: A Step-by-Step GuideTab 1: Load DataTab 2: NormalizationTab 3: Volcano PlotTab 4: Correlation PlotTab 5: pi0 EstimationTab 6: Marker SignaturesRepository StructureFeaturesModular Pipeline: A 6-tab interface that walks the user from raw data to final analysis.Robust Data Loading: Supports loading separate protein matrix and sample metadata files, ensuring compatibility.Normalization Suite: Includes common normalization methods (Log2, Total Sum, Quantile, Median, etc.) with boxplot visualization.Differential Expression: Generates interactive volcano plots to find up/down-regulated proteins.Correlation Analysis: Correlates protein expression with other proteins or with sample metadata.Statistical Validation: Includes a pi0 estimation tab to assess the proportion of true null hypotheses from the p-value distribution.Advanced Signature Analysis: A powerful module (Tab 6) for complex marker analysis:Marker File Mode: Define complex sum all or ratio signatures in an external file.Dynamic Mode: Explore data by dynamically creating signatures from any annotation column (e.g., "Division", "Category").Meta-Matrix: Run and visualize dozens of comparisons at once in a summary heatmap.Data Source-Switching: Validate all signature analyses by instantly switching between Raw and Normalized data.InstallationTo run this app on your local machine, you will need R and RStudio.Step 1: Install R and RStudioR: Download and install the R programming language from the Comprehensive R Archive Network (CRAN).RStudio: Download and install the free RStudio Desktop IDE from the RStudio (Posit) website.Step 2: Get the App CodeYou can either download this repository as a ZIP file or clone it using Git:git clone \[URL\_TO\_YOUR\_REPO]
-Unzip the file if necessary and place the folder in a convenient location.Step 3: Install Required R PackagesOpen RStudio and run the following command in the Console to install all the necessary packages. This may take a few minutes.# Install packages from CRAN
+# ⭐ Proteomics Gem – Analysis Pipeline (PAP)
+*A modular Shiny application for end-to-end proteomics analysis*
+
+## 📒 Table of Contents
+1. [Features](#features)  
+2. [Installation](#installation)  
+3. [How to Run the App](#how-to-run-the-app)  
+4. [App Workflow (Step-by-Step)](#app-workflow-step-by-step)  
+   - [Tab 1 – Load Data](#tab-1-load-data)  
+   - [Tab 2 – Normalization](#tab-2-normalization)  
+   - [Tab 3 – Volcano Plot](#tab-3-volcano-plot)  
+   - [Tab 4 – Correlation Plot](#tab-4-correlation-plot)  
+   - [Tab 5 – pi0 Estimation](#tab-5-pi0-estimation)  
+   - [Tab 6 – Marker Signatures](#tab-6-marker-signatures)  
+5. [Repository Structure](#repository-structure)
+
+---
+
+## ✨ Features
+- **Modular 6-tab pipeline** guiding users from raw input to high-level signature analysis  
+- **Robust data ingestion** for protein matrices + sample metadata  
+- **Normalization suite** (Log2, Total Sum Scaling, Quantile, Median, etc.)  
+- **Differential expression** via interactive volcano plots  
+- **Correlation explorer** for protein–protein and protein–metadata relationships  
+- **pi0 estimation** for statistical validation of p-value distributions  
+- **Advanced signature analysis**, including dynamic, marker-file, and meta-matrix modes  
+- **Raw vs Normalized data toggling** for validation and comparison  
+
+---
+
+## 💻 Installation
+
+### 1. Install R and RStudio
+Download and install:
+- **R** from CRAN  
+- **RStudio** from Posit  
+
+### 2. Download or Clone the Repository
+```bash
+git clone https://github.com/yourname/Proteomics-Analysis-Pipeline.git
+```
+
+### 3. Install Required Packages
+```r
 install.packages(c(
-"shiny",
-"DT",
-"ggplot2",
-"plotly",
-"pheatmap",
-"shinycssloaders",
-"reshape2",
-"dplyr",
-"ggrepel"
+  "shiny", "DT", "ggplot2", "plotly", "pheatmap",
+  "shinycssloaders", "reshape2", "dplyr", "ggrepel"
 ))
 
-# Install packages from Bioconductor
-
 if (!requireNamespace("BiocManager", quietly = TRUE))
-install.packages("BiocManager")
+  install.packages("BiocManager")
 
 BiocManager::install(c("limma", "vsn", "cp4p"))
-How to Run the AppOpen RStudio.Go to File > Open Project... and navigate to the folder where you downloaded this repository. Select the .Rproj file (if one exists) or simply open the app.R file.With the app.R file open in the RStudio editor, click the "Run App" button (usually a green arrow) in the top-right corner of the editor pane.The application will launch in a new window, starting on "Tab 1: Load Data".App Workflow: A Step-by-Step GuideThis app is designed to be used in order, from Tab 1 to Tab 6.Tab 1: Load DataThis tab loads all your data. You must load both files to proceed.Logic: This module asks for two separate files. It finds the common samples between the protein data columns and the metadata rows, and validates them. This validated data (raw protein data + sample info) is then passed to all other modules.How to Run (using example data):Click "Browse" for "Upload Protein Matrix" and select Gemcombined\_prot\_insoluble4.csv from the data/ folder.Click "Browse" for "Upload Sample Info" and select sample\_info.csv from the data/ folder.Click the "Load \& Validate Data" button.A validation status and a preview of your sample info will appear. You can now move to Tab 2.Tab 2: NormalizationThis tab applies mathematical transformations to your raw data to correct for technical variation.Logic: The raw protein data from Tab 1 is taken as input. You select a method (e.g., "Quantile", "Total Sum Scaling"). The chosen algorithm is applied, and the resulting normalized data matrix is passed to all downstream analysis tabs. The "None" option simply performs a log2(x+1) transform.How to Run:Select a method from the list.View the boxplots to see the data before and after normalization.The normalized data is now available for Tabs 3-6.Tab 3: Volcano PlotThis tab performs a standard differential expression analysis to find proteins that are significantly different between two groups.Logic: This module uses the normalized data from Tab 2. It identifies all available metadata groups (e.g., "Patient", "Control"). When you select two groups and click "Run", it performs a t-test for every single protein and calculates the p-value and Log2 Fold Change.How to Run:Select "Group 1 (Control)" (e.g., Control).Select "Group 2 (Treatment)" (e.g., Patient).Click "Run Analysis".The plot and tables will populate. The p-values from this analysis are saved for Tab 5.Tab 4: Correlation PlotThis tab lets you explore relationships between variables.Logic: You can perform two types of correlation:Protein vs. Metadata: Correlates the expression of one protein (e.g., "COL1A1") against a numeric metadata variable (e.g., "Age", "Timepoint").Protein vs. Protein: Correlates two different proteins against each other.How to Run:Select the data source (raw or normalized).Choose your correlation type and select the proteins/variables.Click "Generate Plot".Tab 5: pi0 EstimationThis is a statistical validation tab that helps you understand your p-value distribution from Tab 3.Logic: pi0 is the estimated proportion of "true null" hypotheses (i.e., proteins that are not differentially expressed). A high pi0 (e.g., 0.9) is normal. A very low pi0 (e.g., 0.2) might suggest issues with your model or widespread changes. This module takes the list of p-values from the Volcano Plot analysis and uses the cp4p package to estimate pi0.How to Run:First, you must run an analysis in Tab 3.Select an estimation method.Click "Calculate pi0".Tab 6: Marker SignaturesThis is the most advanced analysis tab. It analyzes groups of proteins ("signatures") instead of individual ones.Logic: This module has three separate analysis modes, all of which can be run on Raw or Normalized data (using the "Data Source for Analysis" switch).Single Comparison: Uses an uploaded "Markers File" to define signatures (e.g., total ECM = sum(all Core matrisome proteins)) and compares them between two groups.Meta-Matrix: Runs the "Single Comparison" for many groups at once and shows the results as a heatmap.Dynamic Category Analysis: An exploratory tool. It ignores the "Markers File" and builds signatures dynamically from an "Annotator File" (e.g., it will find all proteins in Division: RBC and make a signature, find all in Category: Collagens and make another).How to Run (Single Comparison):Upload Markers\_module2.csv and StromalAnnotator2.csv from the data/ folder.Select the "Normalized Data" source.Select "Group", "Control", and "Patient".Click "Run Single Analysis".Outputs: This module has its own set of output tabs.Signature List: The main results for the signatures.Full Results Table: Protein-level data for the proteins inside your signatures.Volcano Plot: An interactive plot of the signatures.Heatmap: A heatmap of all proteins in the significant signatures.Feature Viewer: A plot to see the values for a single Gene or Signature.Meta-Matrix: The heatmap output for that specific analysis.Repository StructureProteomics-Analysis-Pipeline/
-|
-|-- app.R                 (Main app file. Click "Run App" here.)
-|-- loader\_module.R       (Code for Tab 1)
-|-- normalization\_module.R(Code for Tab 2)
-|-- volcano\_module.R      (Code for Tab 3)
-|-- correlation\_module.R  (Code for Tab 4)
-|-- pi0\_module.R          (Code for Tab 5)
-|-- marker\_module.R       (Code for Tab 6)
-|-- README.md             (This file.)
-|
-|-- data/                 (Folder for all example data files.)
-|   |-- Gemcombined\_prot\_insoluble4.csv  (Example protein data)
-|   |-- sample\_info.csv                (Example sample metadata)
-|   |-- Markers\_module2.csv            (Example markers file for Tab 6)
-|   |-- StromalAnnotator2.csv          (Example annotator file for Tab 6)
-|
-|-- images/               (Folder for your screenshots.)
-|-- main\_app\_screenshot.png
-|-- tab\_1\_loader\_output.png
-|-- tab\_2\_normalization\_output.png
-|-- tab\_3\_volcano\_output.png
-|-- tab\_4\_correlation\_output.png
-|-- tab\_5\_pi0\_output.png
-|-- tab\_6\_markers\_output.png
+```
 
+---
+
+## 🚀 How to Run the App
+1. Open **RStudio**  
+2. Open the project folder  
+3. Open `app.R`  
+4. Click **Run App**
+
+The app opens in a new window starting on **Tab 1: Load Data**.
+
+---
+
+# 🧭 App Workflow (Step-by-Step)
+
+---
+
+## 🔹 Tab 1 – Load Data
+
+This module:
+- Accepts **Protein Matrix** and **Sample Metadata** CSV files  
+- Validates format and sample name overlap  
+- Passes validated objects to all downstream modules  
+
+### Example Steps:
+1. Upload `Gemcombined_prot_insoluble4.csv`  
+2. Upload `sample_info.csv`  
+3. Click **Load & Validate Data**
+
+### Screenshot Placeholder
+![Tab 1 Loader Output](images/tab_1_loader_output.png)
+
+---
+
+## 🔹 Tab 2 – Normalization
+
+This module:
+- Performs normalization of protein data  
+- Displays before/after boxplots  
+- Makes normalized matrix available to Tabs 3–6  
+
+Supported methods:
+- Log2 transform (default)  
+- Quantile  
+- Total Sum Scaling  
+- Median  
+- None (log2(x+1) only)
+
+### Screenshot Placeholder
+![Tab 2 Normalization Output](images/tab_2_normalization_output.png)
+
+---
+
+## 🔹 Tab 3 – Volcano Plot
+
+This module runs:
+- Group-vs-group t-tests  
+- Computes log2 fold changes  
+- Generates interactive volcano plots  
+- Saves the p-values for usage in Tab 5  
+
+### How to Run:
+1. Select **Group 1**  
+2. Select **Group 2**  
+3. Click **Run Analysis**
+
+### Screenshot Placeholder
+![Tab 3 Volcano Output](images/tab_3_volcano_output.png)
+
+---
+
+## 🔹 Tab 4 – Correlation Plot
+
+This module supports:
+- **Protein vs Protein** correlations  
+- **Protein vs Metadata** correlations  
+
+Data sources:
+- Raw  
+- Normalized  
+
+### How to Run:
+1. Select **Raw** or **Normalized**  
+2. Choose correlation type  
+3. Select variables  
+4. Click **Generate Plot**
+
+### Screenshot Placeholder
+![Tab 4 Correlation Output](images/tab_4_correlation_output.png)
+
+---
+
+## 🔹 Tab 5 – pi0 Estimation
+
+This module:
+- Uses p-values from Tab 3  
+- Estimates the proportion of true null hypotheses  
+- Helps validate whether observed differences are global vs targeted  
+
+Estimation methods include:
+- Bootstrap  
+- Smoother  
+- Histogram-based approaches  
+
+### Screenshot Placeholder
+![Tab 5 pi0 Output](images/tab_5_pi0_output.png)
+
+---
+
+## 🔹 Tab 6 – Marker Signatures
+
+### Three Analysis Modes
+
+#### **1. Single Comparison Mode**
+- Requires **Markers File** + **Annotator File**  
+- Computes multi-protein signatures (sum, ratio, composite signatures)  
+- Compares between two metadata groups  
+
+#### **2. Meta-Matrix Mode**
+- Runs multiple comparisons at once  
+- Outputs a heatmap summarizing comparisons  
+
+#### **3. Dynamic Category Analysis**
+- Ignores marker files  
+- Automatically constructs signatures from annotation categories  
+  (e.g., all “Collagens,” all “Immune Proteins,” etc.)
+
+### How to Run (Single Comparison):
+1. Upload `Markers_module2.csv`  
+2. Upload `StromalAnnotator2.csv`  
+3. Select analysis mode  
+4. Choose groups  
+5. Click **Run Single Analysis**
+
+### Screenshot Placeholder
+![Tab 6 Marker Output](images/tab_6_markers_output.png)
+
+---
+
+# 📂 Repository Structure
+
+```
+Proteomics-Analysis-Pipeline/
+│
+├── app.R
+├── loader_module.R
+├── normalization_module.R
+├── volcano_module.R
+├── correlation_module.R
+├── pi0_module.R
+├── marker_module.R
+├── README.md
+│
+├── data/
+│   ├── Gemcombined_prot_insoluble4.csv
+│   ├── sample_info.csv
+│   ├── Markers_module2.csv
+│   ├── StromalAnnotator2.csv
+│
+└── images/
+    ├── main_app_screenshot.png
+    ├── tab_1_loader_output.png
+    ├── tab_2_normalization_output.png
+    ├── tab_3_volcano_output.png
+    ├── tab_4_correlation_output.png
+    ├── tab_5_pi0_output.png
+    ├── tab_6_markers_output.png
+```
+
+---
