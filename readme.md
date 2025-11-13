@@ -17,7 +17,7 @@
 ---
 
 ## ✨ Features
-- **Modular 6-tab pipeline** guiding users from raw input to high-level signature analysis  
+- **Modular 6-tab pipeline** guiding users from raw input to high-level signature analysis
 - **Robust data ingestion** for protein matrices + sample metadata  
 - **Normalization suite** (Log2, Total Sum Scaling, Quantile, Median, etc.)  
 - **Differential expression** via interactive volcano plots  
@@ -62,6 +62,9 @@ BiocManager::install(c("limma", "vsn", "cp4p"))
 4. Click **Run App**
 
 The app opens in a new window starting on **Tab 1: Load Data**.
+ or
+type in the R console: 
+> shiny::runApp(launch.browser = TRUE)
 
 ---
 
