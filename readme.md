@@ -1,4 +1,4 @@
-# ⭐ Proteomics Gem – Analysis Pipeline (PAP)
+# 💎 Proteomics Gem – Analysis Pipeline  (ofor finding yhe  gems in your data!)
 *A modular Shiny application for end-to-end proteomics analysis*
 
 ## 📒 Table of Contents
