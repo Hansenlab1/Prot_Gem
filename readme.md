@@ -1,5 +1,5 @@
 # 💎 Proteomics Gem – Analysis Pipeline  
-##for finding the  gems in your data!
+For finding the  gems in your data!
 *A modular Shiny application for end-to-end proteomics analysis*
 
 ## 📒 Table of Contents
