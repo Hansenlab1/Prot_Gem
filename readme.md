@@ -1,4 +1,5 @@
-# 💎 Proteomics Gem – Analysis Pipeline  (ofor finding yhe  gems in your data!)
+# 💎 Proteomics Gem – Analysis Pipeline  
+##for finding the  gems in your data!
 *A modular Shiny application for end-to-end proteomics analysis*
 
 ## 📒 Table of Contents
@@ -77,14 +78,13 @@ type in the R console:
 ## 🔹 Tab 1 – Load Data
 
 This module:
-- Accepts **Protein Matrix** and **Sample Metadata** CSV files  
+- Accepts a **Protein Matrix** CSV file (metadata rows need a header with "_meta")  
 - Validates format and sample name overlap  
 - Passes validated objects to all downstream modules  
 
 ### Example Steps:
 1. Upload `Gemcombined_prot_insoluble4.csv`  
-2. Upload `sample_info.csv`  
-3. Click **Load & Validate Data**
+2. Click **Load & Validate Data**
 
 ### Screenshot Placeholder
 ![Tab 1 Loader Output](images/tab_1_loader_output.png)
@@ -104,6 +104,8 @@ Supported methods:
 - Total Sum Scaling  
 - Median  
 - None (log2(x+1) only)
+- SVN
+- Loess
 
 ### Screenshot Placeholder
 ![Tab 2 Normalization Output](images/tab_2_normalization_output.png)
@@ -122,6 +124,7 @@ This module runs:
 1. Select **Group 1**  
 2. Select **Group 2**  
 3. Click **Run Analysis**
+4. you can download the results, or just significantly up- and down- results for further Gene Ontology analysis
 
 ### Screenshot Placeholder
 ![Tab 3 Volcano Output](images/tab_3_volcano_output.png)
@@ -131,7 +134,7 @@ This module runs:
 ## 🔹 Tab 4 – Correlation Plot
 
 This module supports:
-- **Protein vs Protein** correlations  
+- **Protein vs Protein** correlations (not yet!) 
 - **Protein vs Metadata** correlations  
 
 Data sources:
@@ -143,20 +146,22 @@ Data sources:
 2. Choose correlation type  
 3. Select variables  
 4. Click **Generate Plot**
+5. you can "download"" a svg or pdf version of the plot
+6. "download" significant positive and negative correlations for further data analysis
 
 ### Screenshot Placeholder
 ![Tab 4 Correlation Output](images/tab_4_correlation_output.png)
 
 ---
 
-## 🔹 Tab 5 – pi0 Estimation
+## 🔹 Tab 5 – π0 (pi0) Estimation
 
 This module:
 - Uses p-values from Tab 3  
 - Estimates the proportion of true null hypotheses  
 - Helps validate whether observed differences are global vs targeted  
 
-Estimation methods include:
+Estimation methods include: (these need testing!)
 - Bootstrap  
 - Smoother  
 - Histogram-based approaches  
@@ -212,7 +217,6 @@ Proteomics-Analysis-Pipeline/
 │
 ├── data/
 │   ├── Gemcombined_prot_insoluble4.csv
-│   ├── sample_info.csv
 │   ├── Markers_module2.csv
 │   ├── StromalAnnotator2.csv
 │
