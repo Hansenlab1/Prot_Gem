@@ -62,7 +62,9 @@ BiocManager::install(c("limma", "vsn", "cp4p"))
 4. Click **Run App**
 
 The app opens in a new window starting on **Tab 1: Load Data**.
- or
+
+or..
+
 type in the R console: 
 > shiny::runApp(launch.browser = TRUE)
 
