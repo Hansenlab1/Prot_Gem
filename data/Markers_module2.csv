@@ -1,0 +1,12 @@
+﻿Parent Signature group,level1  signature,level2 signature,description,GENEs to use in calculation,calculation
+ECM,total ECM,,total ECM,Division: Core matrisome,sum all
+ECM,total Matrisome-associated,,total Matrisome-associated,Division: Matrisome-associated,sum all
+ECM,total COL,,this will be a measure of all collagens in a sample,Category: Collagens,sum all
+ECM,total FBG,,this will be a measure of all fibrinogen chains in a sample,Subcategory: FBG,sum all
+ECM,total Clot,,this will be a measure of all clot proteins in a sample,Category: Clot,sum all
+ECM,%ECM,,percent ECM,Division: Core matrisome,total ECM/total protein signal
+ECM,% Matrisome-associated,,percent Matrisome-associated,Division: Matrisome-associated,total Matrisome-associated/total protein signal
+ECM,% COL,,percent collagen,Category: Collagens,total COL/total protein signal
+Cell,Total RBC,,total RBC protein signal,Division: RBC,sum all
+Cell,Total neutrophil granule,,total nuetrophil granule protein signal,Category: Neutrophil granule,sum all
+Cell,total plt granule,,total platelet granule signal,platelet: a-granule,sum all

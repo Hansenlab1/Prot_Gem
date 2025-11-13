@@ -1,0 +1,37 @@
+﻿Gene_Symbol,THPA,common_name,Notes_1,Gene_Name,Division,Category,Subcategory,Functional,Sub_Functional,platelet,Associated_Cell_Type,Uniqueness_Score,LikelyBloodAssociation,Neutrophil
+COL1A1,ENSG00000108821,,,"collagen, type I, alpha 1",Core matrisome,Collagens,Fibrillar Collagen,,,,,,,
+COL5A1,ENSG00000130635,,,"collagen, type V, alpha 1",Core matrisome,Collagens,Fibrillar Collagen,,,,,,,
+COL5A2,#N/A,,,"collagen, type V, alpha 2",Core matrisome,Collagens,Fibrillar Collagen,,,,,,,
+COL11A2,#N/A,,,"collagen, type XI, alpha 2",Core matrisome,Collagens,Fibrillar Collagen,,,,,,,
+COL1A2,ENSG00000164692,,,"collagen, type I, alpha 2",Core matrisome,Collagens,Fibrillar Collagen,,,,,,,
+FN1,#N/A,,,fibronectin 1,Core matrisome,ECM Glycoproteins,Structural ECM,,,a-granule,,,0.5,
+FGA,ENSG00000171560,,,fibrinogen alpha chain,Core matrisome,ECM Glycoproteins,FBG,,Coagulation,a-granule,,,1,
+FGB,ENSG00000171564,,,fibrinogen beta chain,Core matrisome,ECM Glycoproteins,FBG,,Coagulation,a-granule,,,1,
+FGG,ENSG00000171557,,,fibrinogen gamma chain,Core matrisome,ECM Glycoproteins,FBG,,Coagulation,a-granule,,,1,
+VWF,#N/A,,,von Willebrand factor,Core matrisome,ECM Glycoproteins,,Coagulation,Other ECM Regulator,a-granule,,,0.5,
+F10,#N/A,,,coagulation factor X,Matrisome-associated,ECM Regulators,Protease,Coagulation Protease,Coagulation,,,,1,
+F12,#N/A,,,coagulation factor XII (Hageman factor),Matrisome-associated,ECM Regulators,Protease,Coagulation Protease,Coagulation,,,,1,
+F2,#N/A,,,coagulation factor II (thrombin),Matrisome-associated,ECM Regulators,Protease,Coagulation Protease,Coagulation,,,,1,
+F7,ENSG00000057593,,,coagulation factor VII (serum prothrombin conversion accelerator),Matrisome-associated,ECM Regulators,Protease,Coagulation Protease,Coagulation,,,,1,
+F9,#N/A,,,coagulation factor IX,Matrisome-associated,ECM Regulators,Protease,Coagulation Protease,Coagulation,,,,1,
+PLG,#N/A,,,plasminogen,Matrisome-associated,ECM Regulators,Protease,Coagulation Protease,Coagulation,,,,1,
+SERPINA1,ENSG00000197249,,,"serpin peptidase inhibitor, clade A (alpha-1 antiproteinase, antitrypsin), member 1",Matrisome-associated,ECM Regulators,Protease Inhibitor,SERPIN,,a-granule,,,1,
+SERPINB1,ENSG00000021355,,,"serpin peptidase inhibitor, clade B (ovalbumin), member 1",Matrisome-associated,ECM Regulators,Protease Inhibitor,SERPIN,,,,,1,
+SERPINE1,ENSG00000106366,,,"serpin peptidase inhibitor, clade E (nexin, plasminogen activator inhibitor type 1), member 1",Matrisome-associated,ECM Regulators,Protease Inhibitor,SERPIN,,a-granule,,,1,
+SERPINF1,#N/A,,,"serpin peptidase inhibitor, clade F (alpha-2 antiplasmin, pigment epithelium derived factor), member 1",Matrisome-associated,ECM Regulators,Protease Inhibitor,SERPIN,,,,,1,
+SERPING1,#N/A,,,"serpin peptidase inhibitor, clade G (C1 inhibitor), member 1",Matrisome-associated,ECM Regulators,Protease Inhibitor,SERPIN,,,,,1,
+SERPINH1,#N/A,,,"serpin peptidase inhibitor, clade H (heat shock protein 47), member 1, (collagen binding protein 1)",Matrisome-associated,ECM Regulators,Protease Inhibitor,SERPIN,,,,,1,
+HBB,#N/A,,,Hemoglobin β chain,RBC,Hemoglobin,,,,,RBC,,1,
+HBA1,#N/A,,,Hemoglobin α chain,RBC,Hemoglobin,,,,,RBC,,1,
+HBA2,#N/A,,,Hemoglobin α chain,RBC,Hemoglobin,,,,,RBC,,1,
+CLU,#N/A,,,Clusterin (Apolipoprotein J),neutrophil,Neutrophil granule,,,,a-granule,,,0.5,
+HEXB,#N/A,,,β-Hexosaminidase subunit B,neutrophil,Neutrophil granule,,,,a-granule,,,,
+ELANE,#N/A,,,Neutrophil elastase,neutrophil,Neutrophil granule,,,,,,,,granules
+PRTN3,#N/A,,,Proteinase-3 (myeloblastin),neutrophil,Neutrophil granule,,,,,,,,granules
+CTSG,#N/A,,,Cathepsin G,neutrophil,Neutrophil granule,,,,,,,,granules
+AZU1,#N/A,,,Azurocidin / CAP37,neutrophil,Neutrophil granule,,,,,,,,granules
+DEFA1,#N/A,,,α-Defensin 1 (HNP-1),neutrophil,Neutrophil granule,,,,,,,,granules
+DEFA3,#N/A,,,α-Defensin 3 (HNP-3),neutrophil,Neutrophil granule,,,,,,,,granules
+DEFA4,#N/A,,,α-Defensin 4 (HNP-4),neutrophil,Neutrophil granule,,,,,,,,granules
+BPI,#N/A,,,Bactericidal/permeability-increasing protein,neutrophil,Neutrophil granule,,,,,,,,granules
+LYZ,#N/A,,,Lysozyme C,neutrophil,Neutrophil granule,,,,,,,,granules
