@@ -69,6 +69,13 @@ volcano_ui <- function(id) {
                    style = "display: flex; gap: 10px; margin-bottom: 20px;"
                  ),
                  
+                 # --- ADDED: Download Plot Buttons ---
+                 div(
+                   style = "margin-top: 15px; display: flex; gap: 10px;",
+                   downloadButton(ns("download_plot_pdf"), "Download Plot (PDF)", class = "btn-default"),
+                   downloadButton(ns("download_plot_svg"), "Download Plot (SVG)", class = "btn-default")
+                 ),
+                 
                  # --- NEW: Results Table ---
                  tags$hr(),
                  h4("Top 25 Significant Proteins"),

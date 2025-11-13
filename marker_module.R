@@ -334,7 +334,7 @@ marker_server <- function(id, loaded_data, normalized_data) {
         }) 
       })
     
-    output$signature_summary_table <- DT::renderDataTable({ req(analysis_results()$full_results); datatable(analysis_results()$full_results, rownames=F, options=list(ordering=F, scrollX=T,dom='Bfrtip',buttons=c('copy','csv','excel')), extensions='Buttons') %>% formatSignif(columns=c("Group1_Mean","Group2_Mean","Log2_FC","P_Value","FDR"), digits=3) })
+    output$signature_summary_table <- DT::renderDataTable({ req(analysis_results()$full_results); datatable(analysis_results()$full_results, rownames=F, options=list(pagelength=25, ordering=F, scrollX=T,dom='Bfrtip',buttons=c('copy','csv','excel')), extensions='Buttons') %>% formatSignif(columns=c("Group1_Mean","Group2_Mean","Log2_FC","P_Value","FDR"), digits=3) })
     output$full_results_table <- DT::renderDataTable({
       req(analysis_results()$all_proteins)
       
@@ -344,7 +344,7 @@ marker_server <- function(id, loaded_data, normalized_data) {
       cols_to_format <- c("Log2_FC", "P_Value", "FDR")
       
       # Create the base datatable
-      dt <- datatable(df, rownames=F, options=list(scrollX=T,pageLength=20,dom='BfIrtip',buttons=c('copy','csv','excel')), extensions='Buttons')
+      dt <- datatable(df, rownames=F, options=list(scrollX=T,pageLength=25,dom='BfIrtip',buttons=c('copy','csv','excel')), extensions='Buttons')
       
       # Check if all those columns actually exist in the current data frame
       if (all(cols_to_format %in% colnames(df))) {
