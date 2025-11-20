@@ -334,27 +334,91 @@ marker_server <- function(id, loaded_data, normalized_data) {
         }) 
       })
     
-    output$signature_summary_table <- DT::renderDataTable({ req(analysis_results()$full_results); datatable(analysis_results()$full_results, rownames=F, options=list(pagelength=25, ordering=F, scrollX=T,dom='Bfrtip',buttons=c('copy','csv','excel')), extensions='Buttons') %>% formatSignif(columns=c("Group1_Mean","Group2_Mean","Log2_FC","P_Value","FDR"), digits=3) })
+    output$signature_summary_table <- DT::renderDataTable({
+      req(analysis_results()$full_results)
+      df <- analysis_results()$full_results
+      
+      datatable(
+        df,
+        rownames = FALSE,
+        extensions = 'Buttons',
+        options = list(
+          pageLength = 25,
+          ordering  = FALSE,
+          scrollX   = TRUE,
+          dom       = 'Bfrtip',
+          buttons   = list(
+            list(
+              extend        = 'copy',
+              title         = NULL,
+              exportOptions = list(modifier = list(page = 'all'))
+            ),
+            list(
+              extend        = 'csv',
+              title         = NULL,
+              filename      = "Signature_List",
+              exportOptions = list(modifier = list(page = 'all'))
+            ),
+            list(
+              extend        = 'excel',
+              title         = NULL,
+              filename      = "Signature_List",
+              exportOptions = list(modifier = list(page = 'all'))
+            )
+          )
+        )
+      ) %>%
+        formatSignif(
+          columns = c("Group1_Mean","Group2_Mean","Log2_FC","P_Value","FDR"),
+          digits  = 3
+        )
+    })
+    
     output$full_results_table <- DT::renderDataTable({
       req(analysis_results()$all_proteins)
       
       df <- analysis_results()$all_proteins
       
-      # Define the columns we'd LIKE to format
       cols_to_format <- c("Log2_FC", "P_Value", "FDR")
       
-      # Create the base datatable
-      dt <- datatable(df, rownames=F, options=list(scrollX=T,pageLength=25,dom='BfIrtip',buttons=c('copy','csv','excel')), extensions='Buttons')
+      dt <- datatable(
+        df,
+        rownames   = FALSE,
+        extensions = 'Buttons',
+        options    = list(
+          scrollX    = TRUE,
+          pageLength = 25,
+          dom        = 'BfIrtip',
+          buttons    = list(
+            list(
+              extend        = 'copy',
+              title         = NULL,
+              exportOptions = list(modifier = list(page = 'all'))
+            ),
+            list(
+              extend        = 'csv',
+              title         = NULL,
+              filename      = "Protein_Level_Results",
+              exportOptions = list(modifier = list(page = 'all'))
+            ),
+            list(
+              extend        = 'excel',
+              title         = NULL,
+              filename      = "Protein_Level_Results",
+              exportOptions = list(modifier = list(page = 'all'))
+            )
+          )
+        )
+      )
       
-      # Check if all those columns actually exist in the current data frame
       if (all(cols_to_format %in% colnames(df))) {
-        # If they do (i.e., we ran a "Single Analysis"), then format them
-        dt <- dt %>% formatSignif(columns=cols_to_format, digits=3)
+        dt <- dt %>% formatSignif(columns = cols_to_format, digits = 3)
       }
       
-      # Return the datatable (either formatted or not)
-      return(dt)
+      dt
     })
+    
+    
     output$volcano_plot <- renderPlotly({ req(analysis_results()$full_results); df <- analysis_results()$full_results; df$Significant <- df$FDR < input$fdr_threshold; plot_ly(data=df, x=~Log2_FC, y=~-log10(P_Value), type='scatter', mode='markers', color=~Significant, colors=c("grey","red"), text=~paste("Sig:", Signature, "<br>FDR:", format(FDR,digits=3)), hoverinfo="text") %>% layout(title="Signature Volcano Plot", xaxis=list(title="Log2 FC"), yaxis=list(title="-log10(P-Value)")) })
     output$heatmap <- renderPlot({ req(analysis_results()$significant, use_data(), input$group_var); sig_res <- analysis_results()$significant; defs <- signature_defs(); valid_sigs_lc <- intersect(tolower(sig_res$Signature), names(defs)); sum_sigs_lc <- valid_sigs_lc[sapply(defs[valid_sigs_lc], function(x) x$type=="sum" && isTRUE(x$valid))]; if(length(sum_sigs_lc)==0) return(NULL); s_data <- use_data(); mat <- data.matrix(s_data$norm_data); sig_prots <- unique(unlist(lapply(sum_sigs_lc, function(key) defs[[key]]$genes))); sig_prots <- intersect(sig_prots, rownames(mat)); if(length(sig_prots)<2) return(NULL); g_vals <- as.character(s_data$sample_info[[input$group_var]]); all_samples <- as.character(s_data$sample_info$Sample); g1s <- all_samples[g_vals==input$group1]; g2s <- all_samples[g_vals==input$group2]; plot_mat <- mat[sig_prots, c(g1s,g2s), drop=F]; plot_mat <- plot_mat[apply(plot_mat,1,var,na.rm=T)>0,,drop=F]; if(nrow(plot_mat)<2) return(NULL); mat_scaled <- t(scale(t(log2(plot_mat+1e-9)))); annot_col <- data.frame(Var=factor(rep(c(input$group1,input$group2), times=c(length(g1s),length(g2s))))); colnames(annot_col) <- input$group_var; rownames(annot_col) <- colnames(mat_scaled); pheatmap(mat_scaled, cluster_cols=F, cluster_rows=T, annotation_col=annot_col, show_rownames=F, show_colnames=F, scale="none", main="Significant Signatures Heatmap") })
   }) 
