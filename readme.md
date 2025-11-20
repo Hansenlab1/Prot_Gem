@@ -37,8 +37,21 @@ Download and install:
 - **RStudio** from Posit  
 
 ### 2. Download or Clone the Repository
+
+You can either download the ZIP from GitHub, or clone with Git.
+
+**Option A: Clone with RStudio (recommended)**  
+1. In your browser, go to this repository on GitHub and click the green **Code** button.  
+2. Copy the **HTTPS** URL (e.g. `https://github.com/hansenlab1/Gem-App.git`).  
+3. In **RStudio**, go to: `File` → `New Project…` → **Version Control** → **Git**.  
+4. Paste the URL into **Repository URL**, choose a local folder, and click **Create Project**.
+
+**Option B: Clone via command line**
+
 ```bash
-git clone https://github.com/yourname/Proteomics-Analysis-Pipeline.git
+git clone https://github.com/hansenlab1/Gem_App.git
+cd Gem_App
+
 ```
 
 ### 3. Install Required Packages
