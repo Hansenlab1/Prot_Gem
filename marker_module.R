@@ -43,6 +43,9 @@ marker_ui <- function(id) {
       p("Run analysis on all unique values from one or more annotator columns."),
       uiOutput(ns("annotator_col_ui")), # This will now be a selectizeInput
       actionButton(ns("run_dynamic_analysis"), "Run Dynamic Analysis", class="btn-warning"),
+      br(), br(),
+      # --- NEW DOWNLOAD BUTTON FOR DYNAMIC INPUT + CATEGORIES ---
+      downloadButton(ns("download_dynamic_input"), "Download Dynamic Input + Categories"),
       tags$hr(),
       
       selectInput(ns("padj_method"), "P-Value Correction", choices=c("FDR (BH)"="BH", "Bonferroni"="bonferroni", "None"="none"), selected="BH"),
@@ -333,6 +336,63 @@ marker_server <- function(id, loaded_data, normalized_data) {
           write.csv(combined_data, file) 
         }) 
       })
+    
+    # --- NEW DOWNLOAD: DYNAMIC INPUT + CATEGORIES ---
+    output$download_dynamic_input <- downloadHandler(
+      filename = function() {
+        paste0("Dynamic_Input_", input$data_source, "_", Sys.Date(), ".csv")
+      },
+      content = function(file) {
+        req(use_data(), analysis_data(), annotator_df(), input$dynamic_col)
+        
+        # 1. Current analysis matrix (raw or norm)
+        p_mat <- analysis_data()
+        proteins <- rownames(p_mat)
+        
+        validate(
+          need(!is.null(proteins), "Protein/Gene names must be set as rownames in the data matrix.")
+        )
+        
+        # Base: Protein + all samples
+        base_df <- data.frame(
+          Protein = proteins,
+          p_mat,
+          check.names = FALSE
+        )
+        
+        # 2. Annotator subset with selected dynamic columns
+        annot <- annotator_df()
+        validate(
+          need("Gene_Symbol" %in% colnames(annot), "Annotator must contain a 'Gene_Symbol' column.")
+        )
+        
+        dyn_cols <- intersect(input$dynamic_col, colnames(annot))
+        validate(
+          need(length(dyn_cols) > 0, "Selected dynamic columns not found in annotator.")
+        )
+        
+        annot_sub <- annot[annot$Gene_Symbol %in% proteins,
+                           c("Gene_Symbol", dyn_cols),
+                           drop = FALSE]
+        
+        # Merge by Protein vs Gene_Symbol
+        merged_df <- merge(
+          base_df,
+          annot_sub,
+          by.x  = "Protein",
+          by.y  = "Gene_Symbol",
+          all.x = TRUE
+        )
+        
+        # 3. Reorder: Protein | dynamic cols | sample cols
+        all_cols    <- colnames(merged_df)
+        sample_cols <- setdiff(all_cols, c("Protein", dyn_cols))
+        merged_df   <- merged_df[, c("Protein", dyn_cols, sample_cols), drop = FALSE]
+        
+        # 4. Write out
+        write.csv(merged_df, file, row.names = FALSE)
+      }
+    )
     
     output$signature_summary_table <- DT::renderDataTable({
       req(analysis_results()$full_results)
