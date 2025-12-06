@@ -57,26 +57,48 @@ volcano_ui <- function(id) {
         tabPanel("Volcano Plot & Data",
                  h3("Volcano Plot"),
                  p("This plot shows protein significance (p-value) vs. fold change. Red points are significant based on your cutoffs."),
+                 
+                 # Plot Output
                  plotOutput(ns("volcanoPlot"), height = "600px"),
                  
-                 # --- NEW: Download Buttons ---
                  tags$hr(),
-                 h4("Download Results", style = "margin-top: 20px;"),
+                 h4("Download Plot Image"),
+                 p("Adjust the dimensions below to control the aspect ratio of the downloaded file."),
+                 
+                 # --- Dimension Controls & Download Buttons ---
                  div(
+                   style = "display: flex; align-items: flex-end; gap: 15px; background-color: #f9f9f9; padding: 15px; border-radius: 5px;",
+                   
+                   # Width Input
+                   div(
+                     style = "width: 100px;",
+                     numericInput(ns("plot_width"), "Width (in):", value = 10, min = 2, max = 20)
+                   ),
+                   
+                   # Height Input
+                   div(
+                     style = "width: 100px;",
+                     numericInput(ns("plot_height"), "Height (in):", value = 8, min = 2, max = 20)
+                   ),
+                   
+                   # Download Buttons
+                   div(
+                     downloadButton(ns("download_plot_pdf"), "Download PDF", class = "btn-default"),
+                     downloadButton(ns("download_plot_svg"), "Download SVG", class = "btn-default")
+                   )
+                 ),
+                 
+                 # --- Download Data Buttons ---
+                 tags$hr(),
+                 h4("Download Results CSV"),
+                 div(
+                   style = "margin-top: 10px; display: flex; gap: 10px; margin-bottom: 20px;",
                    downloadButton(ns("download_all"), "Download All", class = "btn-default"),
                    downloadButton(ns("download_up"), "Download Up-regulated", class = "btn-primary"),
-                   downloadButton(ns("download_down"), "Download Down-regulated", class = "btn-info"),
-                   style = "display: flex; gap: 10px; margin-bottom: 20px;"
+                   downloadButton(ns("download_down"), "Download Down-regulated", class = "btn-info")
                  ),
                  
-                 # --- ADDED: Download Plot Buttons ---
-                 div(
-                   style = "margin-top: 15px; display: flex; gap: 10px;",
-                   downloadButton(ns("download_plot_pdf"), "Download Plot (PDF)", class = "btn-default"),
-                   downloadButton(ns("download_plot_svg"), "Download Plot (SVG)", class = "btn-default")
-                 ),
-                 
-                 # --- NEW: Results Table ---
+                 # --- Results Table ---
                  tags$hr(),
                  h4("Top 25 Significant Proteins"),
                  p("Showing the top 25 most significant proteins, sorted by p-value."),
@@ -186,8 +208,8 @@ volcano_server <- function(id, normalized_data) {
     })
     
     
-    # --- Output: Volcano Plot ---
-    output$volcanoPlot <- renderPlot({
+    # --- Reactive: Create Volcano Plot Object ---
+    volcano_plot_obj <- reactive({
       req(analysis_results())
       
       df <- analysis_results()
@@ -205,6 +227,13 @@ volcano_server <- function(id, normalized_data) {
       gg <- ggplot(df, aes(x = log2FC, y = negLog10P, color = significant)) +
         geom_point(alpha = 0.6) +
         scale_color_manual(values = color_map) +
+        
+        # --- FIXED: Explicitly control Y-axis padding ---
+        scale_y_continuous(
+          limits = c(-0.1, NA), 
+          expand = expansion(mult = c(0, 0.05)) # 0% padding bottom, 5% top
+        ) +
+        
         theme_bw(base_size = 14) +
         labs(
           title = paste("Volcano Plot:", input$group2, "vs.", input$group1),
@@ -234,7 +263,37 @@ volcano_server <- function(id, normalized_data) {
     })
     
     
-    # --- Output: P-Value Histogram (Volcano) ---
+    # --- Output: Render Volcano Plot ---
+    output$volcanoPlot <- renderPlot({
+      volcano_plot_obj()
+    })
+    
+    
+    # --- Output: Download Handlers (Plot) ---
+    output$download_plot_pdf <- downloadHandler(
+      filename = function() {
+        paste0("Volcano_", input$group2, "_vs_", input$group1, ".pdf")
+      },
+      content = function(file) {
+        req(volcano_plot_obj())
+        ggsave(file, plot = volcano_plot_obj(), device = "pdf", 
+               width = input$plot_width, height = input$plot_height)
+      }
+    )
+    
+    output$download_plot_svg <- downloadHandler(
+      filename = function() {
+        paste0("Volcano_", input$group2, "_vs_", input$group1, ".svg")
+      },
+      content = function(file) {
+        req(volcano_plot_obj())
+        ggsave(file, plot = volcano_plot_obj(), device = "svg", 
+               width = input$plot_width, height = input$plot_height)
+      }
+    )
+    
+    
+    # --- Output: P-Value Histogram ---
     output$pvalue_histogram <- renderPlot({
       req(analysis_results())
       
@@ -250,23 +309,21 @@ volcano_server <- function(id, normalized_data) {
         )
     })
     
-    # --- NEW: Output: Results Table ---
+    # --- Output: Results Table ---
     output$results_table <- DT::renderDT({
       req(analysis_results())
       
       df <- analysis_results() %>%
-        arrange(pvalue) %>%  # Sort by p-value to show most significant
-        head(25) %>%         # Take top 25
-        mutate(across(where(is.numeric), ~ round(., 4))) # Round for display
+        arrange(pvalue) %>%
+        head(25) %>%
+        mutate(across(where(is.numeric), ~ round(., 4)))
       
       datatable(df,
                 options = list(pageLength = 25, scrollX = TRUE),
                 rownames = FALSE)
     })
     
-    # --- NEW: Download Handlers ---
-    
-    # Download All
+    # --- Output: Download Handlers (CSV) ---
     output$download_all <- downloadHandler(
       filename = function() {
         paste0("volcano_results_all_", input$group2, "_vs_", input$group1, ".csv")
@@ -277,7 +334,6 @@ volcano_server <- function(id, normalized_data) {
       }
     )
     
-    # Download Up-regulated
     output$download_up <- downloadHandler(
       filename = function() {
         paste0("volcano_results_UP_", input$group2, "_vs_", input$group1, ".csv")
@@ -290,7 +346,6 @@ volcano_server <- function(id, normalized_data) {
       }
     )
     
-    # Download Down-regulated
     output$download_down <- downloadHandler(
       filename = function() {
         paste0("volcano_results_DOWN_", input$group2, "_vs_", input$group1, ".csv")
@@ -303,11 +358,7 @@ volcano_server <- function(id, normalized_data) {
       }
     )
     
-    
-    # --- Return results for pi0 module ---
     return(analysis_results)
     
   }) # end moduleServer
 }
-
-

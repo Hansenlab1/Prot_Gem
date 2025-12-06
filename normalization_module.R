@@ -3,9 +3,51 @@
 # normalizing the raw protein data.
 
 library(shiny)
-library(ggplot2) # Added ggplot2 for the boxplot
-# Bioconductor packages are loaded conditionally in the server
-# to avoid errors if they aren't installed yet.
+library(ggplot2)
+library(dplyr)
+# Bioconductor packages (preprocessCore, limma, vsn) are loaded conditionally
+
+# --- HELPER FUNCTIONS (Defined outside ModuleServer) ---
+
+# 1. Helper to calculate plot height based on sample count
+get_plot_height <- function(data) {
+  if (is.null(data)) return(400)
+  n_samples <- ncol(data)
+  # Allocate 20px per sample, minimum 400px
+  return(max(400, n_samples * 20))
+}
+
+# 2. Helper to create the boxplot
+create_boxplot <- function(data_matrix, title, log2_transform = FALSE) {
+  if (is.null(data_matrix)) return(NULL)
+  
+  plot_matrix <- as.matrix(data_matrix)
+  
+  if (log2_transform) {
+    # Handle zeros before log2 to avoid -Inf
+    plot_matrix[plot_matrix == 0] <- NA 
+    plot_matrix <- log2(plot_matrix)
+  }
+  
+  # Reshape for ggplot
+  data_long <- data.frame(
+    Sample = rep(colnames(plot_matrix), each = nrow(plot_matrix)),
+    Intensity = as.vector(plot_matrix)
+  )
+  
+  # Remove NAs/Infs for plotting stability
+  data_long <- data_long[is.finite(data_long$Intensity), ]
+  
+  if (nrow(data_long) == 0) return(NULL)
+  
+  # Use native horizontal boxplot (y = Sample) for better stability than coord_flip
+  ggplot(data_long, aes(x = Intensity, y = Sample, fill = Sample)) +
+    geom_boxplot(outlier.size = 0.5, lwd = 0.3) + 
+    theme_bw() +
+    labs(title = title, x = "Log2(Intensity)", y = NULL) +
+    theme(legend.position = "none")
+}
+
 
 # --- 1. Module UI Function ---
 normalization_ui <- function(id) {
@@ -18,8 +60,7 @@ normalization_ui <- function(id) {
       # --- Sidebar Panel for Inputs ---
       sidebarPanel(
         h4("Normalization Method"),
-        p("Select a method to adjust for systematic technical variation
-          between samples before analysis."),
+        p("Select a method to adjust for systematic technical variation."),
         
         radioButtons(ns("norm_method"), "Select Method:",
                      choices = c(
@@ -30,38 +71,62 @@ normalization_ui <- function(id) {
                        "Mean Centering" = "mean",
                        "Cyclic Loess (limma)" = "loess",
                        "Variance Stabilizing (VSN)" = "vsn"
-                       # Spike-in is omitted for now as it requires
-                       # more complex UI to select the spike-in gene
                      ),
                      selected = "none"
         ),
         
         tags$hr(),
         
-        p(strong("Note:")),
-        p("All methods (except VSN and 'None') will be log2-transformed 
-          for the 'After Normalization' plot and downstream analysis."),
-        p(strong("Quantile, Loess, and VSN")),
-        p("require packages from Bioconductor. If the plots don't appear,
-          please check the R console or README for installation instructions."),
+        # --- PCA Settings ---
+        h4("PCA Settings"),
+        p("Filter proteins used in the PCA plot based on missing data."),
+        sliderInput(ns("pca_missing_threshold"), 
+                    "Max Missing Data (%) Allowed:", 
+                    min = 0, max = 100, value = 50, step = 5),
         
-        # --- *** NEW CODE: DOWNLOAD BUTTON *** ---
+        # --- Checkbox for Ellipses ---
+        checkboxInput(ns("show_ellipse"), "Show 95% Confidence Ellipses", value = FALSE),
+        p(em("Note: Ellipses require at least 4 replicates per group.")),
+        
+        tags$hr(),
+        p(strong("Note:")),
+        p("Quantile, Loess, and VSN require Bioconductor packages."),
+        
         tags$hr(),
         h4("Download Data"),
-        p("Download the normalized and log2-transformed data in the
-          same format as the input file."),
         downloadButton(ns("download_norm_data"), "Download Normalized Data")
-        # --- *** END OF NEW CODE *** ---
-        
       ),
       
       # --- Main Panel for Outputs ---
       mainPanel(
-        h4("Before Normalization (Log2 Scale)"),
-        plotOutput(ns("plot_before"), height = "300px"),
+        
+        # 1. Quality Metrics Table
+        h4("Quality Metrics (Raw vs. Normalized)"),
+        p("Lower CV and higher Correlation generally indicate better normalization."),
+        tableOutput(ns("metrics_table")),
         tags$hr(),
-        h4("After Normalization (Log2 Scale)"),
-        plotOutput(ns("plot_after"), height = "300px")
+        
+        # 2. PCA Plot
+        h4("PCA Analysis (Normalized Data)"),
+        p("This plot shows how samples cluster after normalization. Replicates should group together."),
+        p(em("Note: Remaining missing values in filtered proteins are imputed with the minimum observed value.")),
+        plotOutput(ns("pca_plot"), height = "500px"),
+        tags$hr(),
+        
+        # 3. Boxplots (Scrollable)
+        h4("Intensity Distributions"),
+        p("Compare the data distribution before and after normalization."),
+        
+        fluidRow(
+          column(6, 
+                 h5("Before Normalization"),
+                 uiOutput(ns("ui_plot_before"))
+          ),
+          column(6, 
+                 h5("After Normalization"),
+                 uiOutput(ns("ui_plot_after"))
+          )
+        )
       )
     )
   )
@@ -69,13 +134,11 @@ normalization_ui <- function(id) {
 
 
 # --- 2. Module Server Function ---
-# This server takes the reactive 'loaded_data' from the main app
 normalization_server <- function(id, loaded_data) {
   
   moduleServer(id, function(input, output, session) {
     
     # --- Reactive: Process Raw Data ---
-    # (This reactive is unchanged from your file)
     raw_data <- reactive({
       req(loaded_data())
       prot_data <- loaded_data()$protein_data
@@ -88,19 +151,17 @@ normalization_server <- function(id, loaded_data) {
         colnames(raw_matrix_num) <- cn
         raw_matrix_num
       }, error = function(e) {
-        showNotification(paste("Failed to convert data to numeric matrix:", e$message), type = "error")
         return(NULL)
       })
       req(raw_matrix)
+      # Treat 0 as NA for log transformation safety later
       raw_matrix[raw_matrix == 0] <- NA
       return(raw_matrix)
     })
     
     
     # --- Reactive: Perform Normalization ---
-    # (This reactive is unchanged from your file)
     normalized_data_reactive <- reactive({
-      
       req(loaded_data(), raw_data())
       
       method <- input$norm_method
@@ -122,12 +183,10 @@ normalization_server <- function(id, loaded_data) {
           final_data <- sweep(raw_matrix, 2, norm_factors, "/")
           dimnames(final_data) <- correct_dimnames
         } else if (method == "quantile") {
-          if (!requireNamespace("preprocessCore", quietly = TRUE)) {
-            showNotification("Please install 'preprocessCore' from Bioconductor.", type = "warning")
-            return(NULL)
+          if (requireNamespace("preprocessCore", quietly = TRUE)) {
+            final_data <- preprocessCore::normalize.quantiles(raw_matrix)
+            dimnames(final_data) <- correct_dimnames
           }
-          final_data <- preprocessCore::normalize.quantiles(raw_matrix)
-          dimnames(final_data) <- correct_dimnames
         } else if (method == "median") {
           col_medians <- apply(raw_matrix, 2, median, na.rm = TRUE)
           mean_median <- mean(col_medians)
@@ -140,28 +199,25 @@ normalization_server <- function(id, loaded_data) {
           log2_final_data <- sweep(log2_raw, 2, col_means, "-")
           dimnames(log2_final_data) <- correct_dimnames
         } else if (method == "loess") {
-          if (!requireNamespace("limma", quietly = TRUE)) {
-            showNotification("Please install 'limma' from Bioconductor.", type = "warning")
-            return(NULL)
+          if (requireNamespace("limma", quietly = TRUE)) {
+            log2_final_data <- limma::normalizeCyclicLoess(log2(raw_matrix), method = "fast")
+            dimnames(log2_final_data) <- correct_dimnames
           }
-          log2_final_data <- limma::normalizeCyclicLoess(log2(raw_matrix), method = "fast")
-          dimnames(log2_final_data) <- correct_dimnames
         } else if (method == "vsn") {
-          if (!requireNamespace("vsn", quietly = TRUE)) {
-            showNotification("Please install 'vsn' from Bioconductor.", type = "warning")
-            return(NULL)
+          if (requireNamespace("vsn", quietly = TRUE)) {
+            vsn_fit <- vsn::vsnMatrix(raw_matrix)
+            log2_final_data <- vsn::exprs(vsn_fit)
+            dimnames(log2_final_data) <- correct_dimnames
           }
-          vsn_fit <- vsn::vsnMatrix(raw_matrix)
-          log2_final_data <- vsn::exprs(vsn_fit)
-          dimnames(log2_final_data) <- correct_dimnames
         }
         
-        if (is.null(log2_final_data)) {
+        # Fill missing log2 if the method returned linear data
+        if (is.null(log2_final_data) && !is.null(final_data)) {
           log2_final_data <- log2(final_data)
         }
         
       }, error = function(e) {
-        showNotification(paste("Error during normalization:", e$message), type = "error")
+        showNotification(paste("Error:", e$message), type = "error")
         return(NULL)
       })
       
@@ -175,93 +231,210 @@ normalization_server <- function(id, loaded_data) {
     })
     
     
-    # --- Boxplot Helper Function ---
-    # (This function is unchanged from your file)
-    create_boxplot <- function(data_matrix, title, log2_transform = FALSE) {
-      req(data_matrix)
-      plot_matrix <- as.matrix(data_matrix)
-      if (log2_transform) {
-        plot_matrix <- log2(plot_matrix)
+    # --- Helper: Metrics Calculation ---
+    calculate_metrics <- function(data_matrix, sample_info, is_log2) {
+      groups <- setNames(sample_info$Group, sample_info$Sample)
+      groups <- groups[colnames(data_matrix)]
+      
+      linear_data <- if(is_log2) 2^data_matrix else data_matrix
+      
+      cvs <- c()
+      for(g in unique(groups)) {
+        samps <- names(groups)[groups == g]
+        if(length(samps) > 1) {
+          sub_dat <- linear_data[, samps, drop=FALSE]
+          row_means <- rowMeans(sub_dat, na.rm=TRUE)
+          row_sds <- apply(sub_dat, 1, sd, na.rm=TRUE)
+          valid <- row_means > 0 & !is.na(row_means) & !is.na(row_sds)
+          if(sum(valid) > 0) {
+            g_cvs <- row_sds[valid] / row_means[valid]
+            cvs <- c(cvs, g_cvs)
+          }
+        }
       }
-      data_long <- data.frame(
-        Sample = rep(colnames(plot_matrix), each = nrow(plot_matrix)),
-        Intensity = as.vector(plot_matrix)
-      )
-      ggplot(data_long, aes(x = Sample, y = Intensity, fill = Sample)) +
-        geom_boxplot(na.rm = TRUE) +
-        theme_minimal() +
-        labs(title = title, x = "Sample", y = "Log2(Intensity)") +
-        theme(axis.text.x = element_text(angle = 90, hjust = 1),
-              legend.position = "none")
+      median_cv <- median(cvs, na.rm=TRUE) * 100
+      
+      log_data_for_cor <- if(is_log2) data_matrix else log2(data_matrix)
+      log_data_for_cor[!is.finite(as.matrix(log_data_for_cor))] <- NA
+      
+      cor_vals <- c()
+      suppressWarnings({
+        cor_mat <- cor(log_data_for_cor, use="pairwise.complete.obs")
+      })
+      
+      for(g in unique(groups)) {
+        samps <- names(groups)[groups == g]
+        if(length(samps) > 1) {
+          sub_cor <- cor_mat[samps, samps]
+          vals <- sub_cor[upper.tri(sub_cor)]
+          cor_vals <- c(cor_vals, vals)
+        }
+      }
+      mean_cor <- mean(cor_vals, na.rm=TRUE)
+      
+      return(c(CV = median_cv, COR = mean_cor))
     }
     
-    # --- Output Plots ---
-    # (These are unchanged from your file)
+    
+    # --- Output: Quality Metrics Table ---
+    output$metrics_table <- renderTable({
+      req(raw_data(), normalized_data_reactive(), loaded_data())
+      raw_m <- calculate_metrics(raw_data(), loaded_data()$sample_info, is_log2 = FALSE)
+      norm_m <- calculate_metrics(normalized_data_reactive()$protein_data_log2, 
+                                  loaded_data()$sample_info, is_log2 = TRUE)
+      
+      df <- data.frame(
+        Metric = c("Median Intragroup CV (%)", "Mean Intragroup Correlation"),
+        `Raw Data` = c(sprintf("%.2f%%", raw_m["CV"]), sprintf("%.3f", raw_m["COR"])),
+        `Normalized Data` = c(sprintf("%.2f%%", norm_m["CV"]), sprintf("%.3f", norm_m["COR"]))
+      )
+      df
+    }, striped = TRUE, bordered = TRUE, width = "100%")
+    
+    
+    # --- Output: PCA Plot ---
+    output$pca_plot <- renderPlot({
+      req(normalized_data_reactive(), input$pca_missing_threshold)
+      
+      data_log2 <- normalized_data_reactive()$protein_data_log2
+      sample_info <- normalized_data_reactive()$sample_info
+      
+      # 1. Filter proteins
+      missing_pct <- rowMeans(is.na(data_log2)) * 100
+      keep_rows <- missing_pct <= input$pca_missing_threshold
+      data_filtered <- data_log2[keep_rows, ]
+      
+      validate(
+        need(nrow(data_filtered) > 2, 
+             paste0("No proteins meet the criteria of having <= ", 
+                    input$pca_missing_threshold, "% missing data."))
+      )
+      
+      # 2. Impute for PCA
+      data_for_pca <- as.matrix(data_filtered)
+      min_val <- min(data_for_pca, na.rm = TRUE)
+      if(!is.finite(min_val)) min_val <- 0
+      data_for_pca[is.na(data_for_pca)] <- min_val
+      
+      row_vars <- apply(data_for_pca, 1, var)
+      data_for_pca <- data_for_pca[row_vars > 0, ]
+      
+      validate(
+        need(nrow(data_for_pca) > 2, "Not enough variable proteins to run PCA.")
+      )
+      
+      # 3. Run PCA
+      pca_res <- prcomp(t(data_for_pca), center = TRUE, scale. = TRUE)
+      pca_df <- as.data.frame(pca_res$x)
+      pca_df$Sample <- rownames(pca_df)
+      pca_df <- merge(pca_df, sample_info[, c("Sample", "Group")], by="Sample")
+      
+      # Ensure Group is a factor for plotting
+      pca_df$Group <- as.factor(pca_df$Group)
+      
+      var_explained <- round(100 * (pca_res$sdev^2 / sum(pca_res$sdev^2)), 1)
+      
+      # 4. Build Plot
+      gg <- ggplot(pca_df, aes(x = PC1, y = PC2, color = Group, fill = Group)) +
+        geom_point(size = 4, alpha = 0.8) +
+        theme_bw(base_size = 14) +
+        labs(
+          title = paste0("PCA (Method: ", input$norm_method, ")"),
+          subtitle = paste0("Using proteins with <= ", input$pca_missing_threshold, "% missing data"),
+          x = paste0("PC1 (", var_explained[1], "%)"),
+          y = paste0("PC2 (", var_explained[2], "%)")
+        )
+      
+      # --- FIX: Robust Ellipse Handling ---
+      if (input$show_ellipse) {
+        
+        # INCREASED REQUIREMENT: Count samples per group, require >= 4
+        # 3 points are often unstable/singular for ellipses
+        group_counts <- table(pca_df$Group)
+        valid_groups <- names(group_counts[group_counts >= 4])
+        ellipse_data <- pca_df %>% dplyr::filter(Group %in% valid_groups)
+        
+        if (nrow(ellipse_data) > 0) {
+          # Use tryCatch to prevent app crash if ellipse calculation fails 
+          # (e.g., collinear points)
+          tryCatch({
+            gg <- gg + stat_ellipse(data = ellipse_data, 
+                                    geom = "polygon", 
+                                    alpha = 0.2, 
+                                    level = 0.95, 
+                                    type = "norm", 
+                                    show.legend = FALSE)
+          }, error = function(e) {
+            # Log warning to console or notification but don't crash
+            showNotification("Could not draw ellipses (likely due to data distribution). Showing points only.", type = "warning")
+          })
+        } else {
+          # Optional: inform user why ellipses are missing
+          # showNotification("Ellipses require at least 4 replicates per group.", type = "warning")
+        }
+      }
+      
+      return(gg)
+    })
+    
+    
+    # --- Output: Boxplots (Using external helpers) ---
+    
     output$plot_before <- renderPlot({
-      create_boxplot(raw_data(), "Before Normalization (Log2 Scale)", log2_transform = TRUE)
+      create_boxplot(raw_data(), "", log2_transform = TRUE)
+    })
+    
+    output$ui_plot_before <- renderUI({
+      req(raw_data())
+      h <- get_plot_height(raw_data())
+      div(style = "height: 500px; overflow-y: scroll; border: 1px solid #ddd; padding: 5px;",
+          plotOutput(session$ns("plot_before"), height = paste0(h, "px"))
+      )
     })
     
     output$plot_after <- renderPlot({
       req(normalized_data_reactive())
       log2_data_matrix <- normalized_data_reactive()$protein_data_log2
-      create_boxplot(log2_data_matrix, paste("After", input$norm_method, "Normalization (Log2 Scale)"), log2_transform = FALSE)
+      create_boxplot(log2_data_matrix, "", log2_transform = FALSE)
+    })
+    
+    output$ui_plot_after <- renderUI({
+      req(normalized_data_reactive())
+      h <- get_plot_height(normalized_data_reactive()$protein_data_log2)
+      div(style = "height: 500px; overflow-y: scroll; border: 1px solid #ddd; padding: 5px;",
+          plotOutput(session$ns("plot_after"), height = paste0(h, "px"))
+      )
     })
     
     
-    # --- *** NEW CODE: DOWNLOAD HANDLER *** ---
+    # --- Download Handler ---
     output$download_norm_data <- downloadHandler(
-      
       filename = function() {
         paste0("normalized_data_", input$norm_method, "_", Sys.Date(), ".csv")
       },
-      
       content = function(file) {
-        # We need both the original metadata and the new normalized data
         req(loaded_data(), normalized_data_reactive())
-        
-        # 1. Get the normalized protein data
         norm_prot_data <- normalized_data_reactive()$protein_data_log2
-        
-        # 2. Get the original sample_info
         sample_info <- loaded_data()$sample_info
         
-        # 3. Reconstruct the metadata rows (like "Group", "Age_meta")
-        #    - Remove the "Sample" and "TotalProteins" columns
-        #    - Set rownames to be the Sample names
-        #    - Transpose the dataframe
         meta_df <- sample_info[, !colnames(sample_info) %in% c("Sample", "TotalProteins")]
         rownames(meta_df) <- sample_info$Sample
         meta_rows <- as.data.frame(t(meta_df), check.names = FALSE)
-        
-        # 4. Format both dataframes to have the "Identifier" column
         meta_rows$Identifier <- rownames(meta_rows)
         
-        # Coerce normalized data to data.frame just in case
         norm_prot_data_df <- as.data.frame(norm_prot_data, check.names = FALSE) 
         norm_prot_data_df$Identifier <- rownames(norm_prot_data_df)
         
-        # 5. Get sample columns in the correct order
         sample_cols <- colnames(norm_prot_data) 
-        
-        # 6. Re-order columns to put "Identifier" first
         meta_rows_final <- meta_rows[, c("Identifier", sample_cols)]
         norm_prot_data_final <- norm_prot_data_df[, c("Identifier", sample_cols)]
         
-        # 7. Combine them back together
         output_df <- rbind(meta_rows_final, norm_prot_data_final)
-        
-        # 8. Write to CSV
-        #    We use row.names = FALSE because the row names ("Group", "ProteinA")
-        #    are now properly in the "Identifier" column.
         write.csv(output_df, file, row.names = FALSE)
       }
     )
-    # --- *** END OF NEW CODE *** ---
     
-    
-    # --- Return the reactive data for other modules ---
     return(normalized_data_reactive)
     
   }) # end moduleServer
 }
-
