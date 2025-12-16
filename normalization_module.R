@@ -5,6 +5,8 @@
 library(shiny)
 library(ggplot2)
 library(dplyr)
+library(ggrepel) # Required for non-overlapping labels
+
 # Bioconductor packages (preprocessCore, limma, vsn) are loaded conditionally
 
 # --- HELPER FUNCTIONS (Defined outside ModuleServer) ---
@@ -13,7 +15,6 @@ library(dplyr)
 get_plot_height <- function(data) {
   if (is.null(data)) return(400)
   n_samples <- ncol(data)
-  # Allocate 20px per sample, minimum 400px
   return(max(400, n_samples * 20))
 }
 
@@ -40,11 +41,13 @@ create_boxplot <- function(data_matrix, title, log2_transform = FALSE) {
   
   if (nrow(data_long) == 0) return(NULL)
   
-  # Use native horizontal boxplot (y = Sample) for better stability than coord_flip
   ggplot(data_long, aes(x = Intensity, y = Sample, fill = Sample)) +
     geom_boxplot(outlier.size = 0.5, lwd = 0.3) + 
     theme_bw() +
-    labs(title = title, x = "Log2(Intensity)", y = NULL) +
+    # Dynamic Label depending on if we transformed it or not
+    labs(title = title, 
+         x = if(log2_transform) "Log2(Intensity)" else "Intensity", 
+         y = NULL) +
     theme(legend.position = "none")
 }
 
@@ -53,7 +56,7 @@ create_boxplot <- function(data_matrix, title, log2_transform = FALSE) {
 normalization_ui <- function(id) {
   ns <- NS(id) # Namespace
   
-  fluidPage(
+  tagList(
     titlePanel("Data Normalization"),
     
     sidebarLayout(
@@ -64,7 +67,9 @@ normalization_ui <- function(id) {
         
         radioButtons(ns("norm_method"), "Select Method:",
                      choices = c(
+                       "None (Data is already Log2)" = "already_log2",
                        "None (Use Log2 of Raw Data)" = "none",
+                       "None (Keep Raw Linear - No Log2)" = "linear_pass", # <--- NEW OPTION
                        "Total Sum Scaling (TSS)" = "tss",
                        "Quantile Normalization" = "quantile",
                        "Median Normalization" = "median",
@@ -84,8 +89,9 @@ normalization_ui <- function(id) {
                     "Max Missing Data (%) Allowed:", 
                     min = 0, max = 100, value = 50, step = 5),
         
-        # --- Checkbox for Ellipses ---
+        # --- Checkbox for Ellipses and Labels ---
         checkboxInput(ns("show_ellipse"), "Show 95% Confidence Ellipses", value = FALSE),
+        checkboxInput(ns("show_labels"), "Show Sample Names", value = FALSE),
         p(em("Note: Ellipses require at least 4 replicates per group.")),
         
         tags$hr(),
@@ -172,8 +178,21 @@ normalization_server <- function(id, loaded_data) {
       log2_final_data <- NULL
       
       tryCatch({
-        if (method == "none") {
+        if (method == "already_log2") {
+          # Log2 Input -> Pass Through
+          log2_final_data <- raw_matrix
+          dimnames(log2_final_data) <- correct_dimnames
+          
+        } else if (method == "linear_pass") {
+          # Linear Input -> Pass Through (No Log2)
+          # Note: We store this in 'log2_final_data' variable to keep structure consistent
+          # even though the data is technically linear.
+          log2_final_data <- raw_matrix
+          dimnames(log2_final_data) <- correct_dimnames
+          
+        } else if (method == "none") {
           log2_final_data <- log2(raw_matrix)
+          
         } else if (method == "tss") {
           raw_matrix_for_sum <- raw_matrix
           raw_matrix_for_sum[is.na(raw_matrix_for_sum)] <- 0
@@ -182,27 +201,32 @@ normalization_server <- function(id, loaded_data) {
           norm_factors <- col_sums / mean_sum
           final_data <- sweep(raw_matrix, 2, norm_factors, "/")
           dimnames(final_data) <- correct_dimnames
+          
         } else if (method == "quantile") {
           if (requireNamespace("preprocessCore", quietly = TRUE)) {
             final_data <- preprocessCore::normalize.quantiles(raw_matrix)
             dimnames(final_data) <- correct_dimnames
           }
+          
         } else if (method == "median") {
           col_medians <- apply(raw_matrix, 2, median, na.rm = TRUE)
           mean_median <- mean(col_medians)
           norm_factors <- col_medians / mean_median
           final_data <- sweep(raw_matrix, 2, norm_factors, "/")
           dimnames(final_data) <- correct_dimnames
+          
         } else if (method == "mean") {
           log2_raw <- log2(raw_matrix)
           col_means <- colMeans(log2_raw, na.rm = TRUE)
           log2_final_data <- sweep(log2_raw, 2, col_means, "-")
           dimnames(log2_final_data) <- correct_dimnames
+          
         } else if (method == "loess") {
           if (requireNamespace("limma", quietly = TRUE)) {
             log2_final_data <- limma::normalizeCyclicLoess(log2(raw_matrix), method = "fast")
             dimnames(log2_final_data) <- correct_dimnames
           }
+          
         } else if (method == "vsn") {
           if (requireNamespace("vsn", quietly = TRUE)) {
             vsn_fit <- vsn::vsnMatrix(raw_matrix)
@@ -236,6 +260,7 @@ normalization_server <- function(id, loaded_data) {
       groups <- setNames(sample_info$Group, sample_info$Sample)
       groups <- groups[colnames(data_matrix)]
       
+      # CV must be calculated on Linear Scale
       linear_data <- if(is_log2) 2^data_matrix else data_matrix
       
       cvs <- c()
@@ -254,12 +279,14 @@ normalization_server <- function(id, loaded_data) {
       }
       median_cv <- median(cvs, na.rm=TRUE) * 100
       
-      log_data_for_cor <- if(is_log2) data_matrix else log2(data_matrix)
-      log_data_for_cor[!is.finite(as.matrix(log_data_for_cor))] <- NA
+      # Correlation is usually calculated on Log Scale (or just Input scale)
+      # We just ensure infinite values are handled
+      cor_data <- data_matrix
+      cor_data[!is.finite(as.matrix(cor_data))] <- NA
       
       cor_vals <- c()
       suppressWarnings({
-        cor_mat <- cor(log_data_for_cor, use="pairwise.complete.obs")
+        cor_mat <- cor(cor_data, use="pairwise.complete.obs")
       })
       
       for(g in unique(groups)) {
@@ -279,9 +306,22 @@ normalization_server <- function(id, loaded_data) {
     # --- Output: Quality Metrics Table ---
     output$metrics_table <- renderTable({
       req(raw_data(), normalized_data_reactive(), loaded_data())
-      raw_m <- calculate_metrics(raw_data(), loaded_data()$sample_info, is_log2 = FALSE)
+      
+      # INTELLIGENT METRICS LOGIC:
+      # If user says "Data is already Log2", we assume Input is Log2 (Un-log for CV)
+      # If user says anything else (Linear Pass, None, TSS, etc), we assume Input is Linear.
+      input_is_log2 <- (input$norm_method == "already_log2")
+      
+      # For Output data: 
+      # "linear_pass" output is still Linear.
+      # "already_log2" output is Log2.
+      # All others output Log2.
+      output_is_log2 <- (input$norm_method != "linear_pass")
+      
+      raw_m <- calculate_metrics(raw_data(), loaded_data()$sample_info, is_log2 = input_is_log2)
+      
       norm_m <- calculate_metrics(normalized_data_reactive()$protein_data_log2, 
-                                  loaded_data()$sample_info, is_log2 = TRUE)
+                                  loaded_data()$sample_info, is_log2 = output_is_log2)
       
       df <- data.frame(
         Metric = c("Median Intragroup CV (%)", "Mean Intragroup Correlation"),
@@ -345,18 +385,13 @@ normalization_server <- function(id, loaded_data) {
           y = paste0("PC2 (", var_explained[2], "%)")
         )
       
-      # --- FIX: Robust Ellipse Handling ---
+      # --- Ellipses ---
       if (input$show_ellipse) {
-        
-        # INCREASED REQUIREMENT: Count samples per group, require >= 4
-        # 3 points are often unstable/singular for ellipses
         group_counts <- table(pca_df$Group)
         valid_groups <- names(group_counts[group_counts >= 4])
         ellipse_data <- pca_df %>% dplyr::filter(Group %in% valid_groups)
         
         if (nrow(ellipse_data) > 0) {
-          # Use tryCatch to prevent app crash if ellipse calculation fails 
-          # (e.g., collinear points)
           tryCatch({
             gg <- gg + stat_ellipse(data = ellipse_data, 
                                     geom = "polygon", 
@@ -365,12 +400,25 @@ normalization_server <- function(id, loaded_data) {
                                     type = "norm", 
                                     show.legend = FALSE)
           }, error = function(e) {
-            # Log warning to console or notification but don't crash
-            showNotification("Could not draw ellipses (likely due to data distribution). Showing points only.", type = "warning")
+            showNotification("Could not draw ellipses. Showing points only.", type = "warning")
           })
+        }
+      }
+      
+      # --- Labels (ggrepel) ---
+      if (input$show_labels) {
+        if (requireNamespace("ggrepel", quietly = TRUE)) {
+          gg <- gg + ggrepel::geom_text_repel(
+            aes(label = Sample),
+            size = 3.5,
+            max.overlaps = Inf, 
+            box.padding = 0.5,
+            point.padding = 0.3,
+            min.segment.length = 0, 
+            show.legend = FALSE
+          )
         } else {
-          # Optional: inform user why ellipses are missing
-          # showNotification("Ellipses require at least 4 replicates per group.", type = "warning")
+          gg <- gg + geom_text(aes(label = Sample), vjust = -0.8, size = 3.5, show.legend = FALSE)
         }
       }
       
@@ -378,10 +426,14 @@ normalization_server <- function(id, loaded_data) {
     })
     
     
-    # --- Output: Boxplots (Using external helpers) ---
+    # --- Output: Boxplots ---
     
     output$plot_before <- renderPlot({
-      create_boxplot(raw_data(), "", log2_transform = TRUE)
+      # INTELLIGENT PLOT LOGIC:
+      # Only apply Log2 to "Before" plot if the method involves a Log2 transformation.
+      # If we are doing 'already_log2' or 'linear_pass', we should show the raw input as-is.
+      should_transform <- !(input$norm_method %in% c("already_log2", "linear_pass"))
+      create_boxplot(raw_data(), "", log2_transform = should_transform)
     })
     
     output$ui_plot_before <- renderUI({
@@ -417,7 +469,7 @@ normalization_server <- function(id, loaded_data) {
         norm_prot_data <- normalized_data_reactive()$protein_data_log2
         sample_info <- loaded_data()$sample_info
         
-        meta_df <- sample_info[, !colnames(sample_info) %in% c("Sample", "TotalProteins")]
+        meta_df <- sample_info[, !colnames(sample_info) %in% c("Sample", "TotalProteins"), drop = FALSE]
         rownames(meta_df) <- sample_info$Sample
         meta_rows <- as.data.frame(t(meta_df), check.names = FALSE)
         meta_rows$Identifier <- rownames(meta_rows)
